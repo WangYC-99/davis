@@ -1,0 +1,7 @@
+1) Update ChangeLog, version/date.
+2) Update CMakeLists.txt, version.
+3) Commit, merge to master.
+4) Release on GitLab with release notes (ChangeLog).
+   Makes tag and source tarballs.
+5) Auto-release takes care of all supported OSes.
+6) Announce on mailing lists.

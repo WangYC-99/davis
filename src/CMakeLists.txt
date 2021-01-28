@@ -1,0 +1,87 @@
+SET(LIBCAER_SOURCES
+	ringbuffer.c
+	log.c
+	frame_utils.c
+	filters_dvs_noise.c
+	usb_utils.c
+	autoexposure.c
+	device_discover.c
+	device.c
+	dvs128.c
+	davis.c
+	dynapse.c
+	dvs132s.c
+	dvxplorer.c
+	samsung_evk.c)
+
+# This is often the case due to how we try to have multiple compatible
+# definitions of functions in C.
+SET(LIBCAER_COMPILE_OPTIONS "-Wno-unused-function")
+
+SET(LIBCAER_LINK_LIBRARIES_PRIVATE PkgConfig::libusb ${BASE_LIBS})
+
+IF (OS_LINUX)
+	# Raspberry Pi support available only on Linux.
+	SET(LIBCAER_SOURCES ${LIBCAER_SOURCES} davis_rpi.c)
+ENDIF()
+
+IF (ENABLE_SERIALDEV)
+	# Add serial devices.
+	SET(LIBCAER_SOURCES ${LIBCAER_SOURCES} edvs.c)
+
+	SET(LIBCAER_LINK_LIBRARIES_PRIVATE ${LIBCAER_LINK_LIBRARIES_PRIVATE} PkgConfig::libserialport)
+ENDIF()
+
+IF (ENABLE_OPENCV)
+	# Add C++ OpenCV support.
+	SET(LIBCAER_SOURCES ${LIBCAER_SOURCES} frame_utils_opencv.cpp)
+
+	SET(LIBCAER_LINK_LIBRARIES_PUBLIC ${OpenCV_LIBS})
+
+	# The included C headers need to do this (NULL is 0, nullptr not available).
+	SET(LIBCAER_COMPILE_OPTIONS ${LIBCAER_COMPILE_OPTIONS} $<$<COMPILE_LANGUAGE:CXX>:-Wno-zero-as-null-pointer-constant>)
+
+	# Clang weirdness: also looks into the C code, which of course
+	# will use old-style casts (the only cast available there).
+	IF (CC_CLANG)
+		SET(LIBCAER_COMPILE_OPTIONS ${LIBCAER_COMPILE_OPTIONS} $<$<COMPILE_LANGUAGE:CXX>:-Wno-old-style-cast>)
+	ENDIF()
+ENDIF()
+
+# Set full RPATH
+SET(CMAKE_INSTALL_RPATH ${USER_LOCAL_PREFIX}/${CMAKE_INSTALL_LIBDIR})
+
+ADD_LIBRARY(caer SHARED ${LIBCAER_SOURCES})
+TARGET_COMPILE_OPTIONS(caer PRIVATE ${LIBCAER_COMPILE_OPTIONS})
+TARGET_LINK_LIBRARIES(caer PRIVATE ${LIBCAER_LINK_LIBRARIES_PRIVATE})
+TARGET_LINK_LIBRARIES(caer PUBLIC ${LIBCAER_LINK_LIBRARIES_PUBLIC})
+
+SET_TARGET_PROPERTIES(caer
+	PROPERTIES
+	SOVERSION ${PROJECT_VERSION_MAJOR}
+	VERSION ${PROJECT_VERSION}
+)
+
+IF (OS_WINDOWS)
+	INSTALL(TARGETS caer EXPORT libcaer-exports RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+ELSE()
+	INSTALL(TARGETS caer EXPORT libcaer-exports DESTINATION ${CMAKE_INSTALL_LIBDIR})
+ENDIF()
+
+IF (ENABLE_STATIC)
+	ADD_LIBRARY(caerStatic STATIC ${LIBCAER_SOURCES})
+	TARGET_COMPILE_OPTIONS(caerStatic PRIVATE ${LIBCAER_COMPILE_OPTIONS})
+	TARGET_LINK_LIBRARIES(caerStatic PRIVATE ${LIBCAER_LINK_LIBRARIES_PRIVATE})
+	TARGET_LINK_LIBRARIES(caerStatic PUBLIC ${LIBCAER_LINK_LIBRARIES_PUBLIC})
+
+	SET_TARGET_PROPERTIES(caerStatic
+		PROPERTIES
+		OUTPUT_NAME caer
+	)
+
+	IF (OS_WINDOWS)
+		INSTALL(TARGETS caerStatic EXPORT libcaer-exports RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+	ELSE()
+		INSTALL(TARGETS caerStatic EXPORT libcaer-exports DESTINATION ${CMAKE_INSTALL_LIBDIR})
+	ENDIF()
+ENDIF()

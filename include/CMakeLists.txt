@@ -1,0 +1,2 @@
+ADD_SUBDIRECTORY(libcaer)
+ADD_SUBDIRECTORY(libcaercpp)
